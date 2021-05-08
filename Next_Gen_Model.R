@@ -28,7 +28,7 @@ spectra <- lapply(spectra, function(x){
   }
 )
 
-#Round Wavenumber Values
+##[UNDECIDED]Round Wavenumber Values##
 spectra <- lapply(spectra, function(x){
   x$Wavenumber <- round(x$Wavenumber)
   return(x)
@@ -104,6 +104,8 @@ write.csv(file_names, file = "File Names.csv")
 ##Add Files + KD values to Target Variables.csv if necessary
 #Load Target Variables Data
 Targets <- read.csv("Target Variables.csv", sep = ",", row.names = 1)
+##[UNDECIDED]Log-transform KD Values
+Targets <- log10(Targets)
 ###END###
 
 ####Plot the ATR Spectra####
@@ -343,23 +345,39 @@ coef1 <- coef(plsr.fit, intercept = TRUE, ncomp = 1)[[1]]
 
 (test$MIR)%*%plsr.fit[[1]][1:1422]+coef1 
 
-predict(plsr.fit, ncomp = 1, newdata = test)
+predict(plsr.fit, ncomp = 3, newdata = test)
+
+#Store Predicted Values as log-Untransformed
+predicted_values <- 10^predict(plsr.fit, ncomp = 3, newdata = test)
+
+plot(predicted_values,
+     10^test[,1],
+     type = "p",
+     asp = 1,
+     axes = FALSE
+     )
+abline( a = 0, b = 1)
+axis(1, pos=0)
+axis(2, pos=0)
+
 
 #Plot fit for training data
-
-plot(plsr.fit, ncomp = 2, asp = 1, line = TRUE,
-     xlim = c(0, 1000),
-     ylim = c(0,600),
+plot(plsr.fit, ncomp = 3, asp = 1, line = TRUE)#,
+     #xlim = c(0, 1000),
+     #ylim = c(0,600),
      axes = FALSE
 )
 axis(1, pos=0)
 axis(2, pos=0)
 
-text(x = plsr.fit[[2]][,1], 
-     y = plsr.fit[[9]][,1], 
-     labels = paste(gsub("_.*","", names(plsr.fit[[2]][,1]))), 
+text(x = spectra.df[,1], 
+     y = plsr.fit[[9]][28:54], 
+     labels = paste(gsub("_.*","", names(plsr.fit[[2]][,2]))), 
      pos = 3
 )
+
+#Predicted KD values of Training Data
+predict(plsr.fit, ncomp = 3, asp = 1, line = TRUE)
 
 #Predict KD values of Test Data
 plot(plsr.fit, ncomp = 3, asp = 1, line = TRUE, newdata = test)
