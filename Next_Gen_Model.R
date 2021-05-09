@@ -104,8 +104,6 @@ write.csv(file_names, file = "File Names.csv")
 ##Add Files + KD values to Target Variables.csv if necessary
 #Load Target Variables Data
 Targets <- read.csv("Target Variables.csv", sep = ",", row.names = 1)
-##[UNDECIDED]Log-transform KD Values
-Targets <- log10(Targets)
 ###END###
 
 ####Plot the ATR Spectra####
@@ -130,6 +128,7 @@ matplot(wavenumbers,
         xlim = wavenumber,
         col = col_set
         )
+minor.tick(nx = 5)
 legend("top", legend = names(spectra_avg), lty=c(1,1), lwd=c(2.5,2.5), col = col_set)
 ###END###
 
@@ -220,6 +219,9 @@ lapply(names(spectra), function(x){
 spectra.df <- data.frame(row.names = names(spectra_avg))
 
 spectra.df$Kd <- Targets$Kd
+
+##[UNDECIDED]Log-transform KD Values
+spectra.df$logKd <- log10(Targets)
 ###END###
 
 
@@ -303,7 +305,7 @@ test <- subset(spectra.df, split == F)
 
 
 ####Run Model on Full Spectrum####
-plsr.fit <- plsr(Kd ~ MIR,
+plsr.fit <- plsr(logKd ~ MIR,
                      ncomp = 5,
                      data = train,
                      validation = "CV",
@@ -336,8 +338,16 @@ plot(plsr.fit[[1]],
      type = "l")
 
 #For one component only
-plot(plsr.fit[[1]][1:1422],
-     type = "l")
+plot(wavenumbers[c(cm3600_2200, cm1900_650), ],
+     plsr.fit[[1]][(1422*3):((1422*3)+1421)],
+     type = "l",
+     xlim = c(3600,650),
+     xlab = "Wavenumber",
+     ylab = "Coefficient",
+     main = "Regression Coefficients by Wavenumber"
+     )
+abline(h = 0)
+minor.tick(nx = 5)
 
 ##Test to see if coefficients are indeed the regression coefficients Y onto X
 #Account for mean centering by calculating the intercept to add
@@ -362,13 +372,13 @@ axis(2, pos=0)
 
 
 #Plot fit for training data
-plot(plsr.fit, ncomp = 3, asp = 1, line = TRUE)#,
-     #xlim = c(0, 1000),
-     #ylim = c(0,600),
-     axes = FALSE
-)
-axis(1, pos=0)
-axis(2, pos=0)
+plot(plsr.fit, ncomp = 3, line = TRUE,
+     xlim = c(1, 4),
+     ylim = c(1, 4))#,
+     #axes = FALSE
+#)
+#axis(1, pos=0)
+#axis(2, pos=0)
 
 text(x = spectra.df[,1], 
      y = plsr.fit[[9]][28:54], 
@@ -376,11 +386,16 @@ text(x = spectra.df[,1],
      pos = 3
 )
 
-#Predicted KD values of Training Data
-predict(plsr.fit, ncomp = 3, asp = 1, line = TRUE)
+#Obtain Predicted KD values of Training Data
+predict(plsr.fit, ncomp = 3)
 
 #Predict KD values of Test Data
-plot(plsr.fit, ncomp = 3, asp = 1, line = TRUE, newdata = test)
+predict(plsr.fit, ncomp = 3, newdata = test)
+
+plot(plsr.fit, ncomp = 3, line = TRUE, newdata = test,
+     xlim = c(1,4),
+     ylim = c(1,4)
+     )
 
 RMSEP(plsr.fit, ncomp = 3, newdata = test)
 
