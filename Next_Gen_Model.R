@@ -255,21 +255,83 @@ spectra.df$MW <- c(1,0,1,1,1,1,1,1,1,1,1,0,0,1,1,1,0,0,1,1,1,1,1,0,1,1,1)
 
 
 ####Calculate Second Derivative for Peak Assignment####
+#Note: n = 7 was found to best capture peaks in absorbance, with find_peaks tolerance (below)
+# set to m = 5.  However this might be overfitting so we will go with the following:
+
 MIR.deriv <- apply(spectra.df$MIR, 
-                   MARGIN = 2, 
+                   MARGIN = 1, 
                    FUN = sgolayfilt, 
-                   p = 2, n = 5, m = 2, ts = 1
+                   p = 3, n = 11, m = 2, ts = 1
                    )
-spectra.df$MIR.deriv <- MIR.deriv
 
-matplot(wavenumbers[c(cm3600_2200, cm1900_650), ],
-        t(MIR.deriv),
-        type = "l"
+spectra.df$MIR.deriv <- t(MIR.deriv)
+
+#Peak-finding Alogrithm from https://stats.stackexchange.com/questions/22974/how-to-find-local-peaks-valleys-in-a-series-of-data
+find_peaks <- function (x, m = 3){
+  shape <- diff(sign(diff(x, na.pad = FALSE)))
+  pks <- sapply(which(shape < 0), FUN = function(i){
+    z <- i - m + 1
+    z <- ifelse(z > 0, z, 1)
+    w <- i + m + 1
+    w <- ifelse(w < length(x), w, length(x))
+    if(all(x[c(z : i, (i + 2) : w)] <= x[i + 1])) return(i + 1) else return(numeric(0))
+  })
+  pks <- unlist(pks)
+  pks
+}
+
+#Plot All Spectra
+#matplot(wavenumbers,
+#        t(MIR.deriv),
+#        type = "l",
+#        xlim = c(1800,650)
+#)
+
+#Create a List of All Peaks Calculated for 2nd Derivative Spectra
+peaks.list <- apply(spectra.df$MIR.deriv, MARGIN = 1, function(i)wavenumbers[find_peaks(-i, m = 4),]) 
+
+#Keep Region Below 1800 cm-1
+peaks.list <- lapply(peaks.list, function(i)i[which(i < 1800)])
+
+#Extract Peaks for One Compound
+#lignin_HMW_peaks <- peaks.list$May5_Lignin_HMW[peaks.list$May5_Lignin_HMW < 1800]
+
+#Plot Single 2nd Derivative Spectrum
+matplot(wavenumbers,
+        spectra.df$MIR.deriv["May5_Lignin_HMW",],
+        type = "l",
+        xlim = c(1800,650),
+        main = "May5_Lignin_HMW"
 )
+minor.tick(nx = 4)
+
+#Locate Peaks in 2nd Derivative Spectrum
+#peaks <- wavenumbers[find_peaks(-spectra.df$MIR.deriv["Apr6_TPC_1-0-0_HMW",], m = 4),]
+
+#Plot Found Peaks Against Absorbance Spectrum
+#plot(wavenumbers[,1],
+#     spectra_avg$`Apr6_TPC_1-0-0_HMW`,
+#     type = "l",
+#     xlim = c(1800, 650))
+
+#minor.tick(nx = 4)
+#abline(v = peaks.list$`Apr6_TPC_1-0-0_HMW`, col = "red")
+
+#Plot Found Peaks Against Absorbance Spectrum for All Compounds
+for (i in colnames(spectra_avg)){
+     plot(wavenumbers[,1],
+          spectra_avg[[i]],
+          type = "l",
+          xlim = c(1800, 650),
+          main = i
+          )
+  minor.tick(nx = 4)
+  abline(v = peaks.list[[i]], col = "red")
+}
+
+#write.csv(round(peaks[which(peaks < 1800)]), file = "Peaks_Apr6_TPC_1-0-0_HMW.csv")
+
 ###END###
-
-
-
 
 #####[DEPRECATED]For Derivative of Absorbance####
 MIR.deriv <-  sapply(spectra, function(x){
@@ -293,6 +355,7 @@ wavenumbers <- as.vector(spectra[[1]][1])
 #Spectral Regions of Interest
 cm3600_2200 <- which(between(wavenumbers[[1]], 2200, 3600) == TRUE)
 cm1900_650 <- which(between(wavenumbers[[1]], 650, 1900) == TRUE)
+wavenumbers_NoCO2 <- wavenumbers[c(cm3600_2200, cm1900_650), 1]
 
 spectra.df$MIR <- spectra.df$MIR[, c(cm3600_2200, cm1900_650)]
 set.seed(123)
