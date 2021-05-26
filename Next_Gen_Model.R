@@ -97,11 +97,13 @@ for(i in seq(0, length(spectra)-3, 3)){
 }
 spectra_avg <- data.frame(spectra_avg[ , -1])
 colnames(spectra_avg) <- file_names
+###END###
 
-#Write the file names to csv
+####Add Compounds + Kd values to Target Variables.csv if necessary####
+#Write the file names of compounds to csv
 write.csv(file_names, file = "File Names.csv")
+#Manually copy file names to Target Variables.csv and add in Kd data 
 
-##Add Files + KD values to Target Variables.csv if necessary
 #Load Target Variables Data
 Targets <- read.csv("Target Variables.csv", sep = ",", row.names = 1)
 ###END###
@@ -164,7 +166,7 @@ lapply(names(spectra), function(x){
 )
 ###END###
 
-####Export Spectra for Peak Fitting####
+####[DEPRECATED]Export Spectra for Peak Fitting####
 write.csv(cbind(wavenumbers, spectra_avg$`Mar30_TPC_0-0-1_HMW`),
           row.names = FALSE,
           file = "/home/alex/Desktop/CNOM_HMW.csv"
@@ -220,8 +222,8 @@ spectra.df <- data.frame(row.names = names(spectra_avg))
 
 spectra.df$Kd <- Targets$Kd
 
-##[UNDECIDED]Log-transform KD Values
-spectra.df$logKd <- log10(Targets)
+#Log-transform KD Values
+spectra.df$logKd <- log10(Targets$Kd)
 ###END###
 
 
@@ -290,7 +292,7 @@ find_peaks <- function (x, m = 3){
 #Create a List of All Peaks Calculated for 2nd Derivative Spectra
 peaks.list <- apply(spectra.df$MIR.deriv, MARGIN = 1, function(i)wavenumbers[find_peaks(-i, m = 4),]) 
 
-#Keep Region Below 1800 cm-1
+#Retain Only Region Below 1800 cm-1
 peaks.list <- lapply(peaks.list, function(i)i[which(i < 1800)])
 
 #Extract Peaks for One Compound
@@ -305,7 +307,7 @@ matplot(wavenumbers,
 )
 minor.tick(nx = 4)
 
-#Locate Peaks in 2nd Derivative Spectrum
+#[DEPRECATED]Locate Peaks in 2nd Derivative Spectrum
 #peaks <- wavenumbers[find_peaks(-spectra.df$MIR.deriv["Apr6_TPC_1-0-0_HMW",], m = 4),]
 
 #Plot Found Peaks Against Absorbance Spectrum
@@ -361,7 +363,7 @@ spectra.df$MIR <- spectra.df$MIR[, c(cm3600_2200, cm1900_650)]
 set.seed(123)
 split <- sample.split(spectra.df$Kd, SplitRatio = 0.7)
 
-train <- spectra.df
+#train <- spectra.df
 train <- subset(spectra.df, split == T)
 test <- subset(spectra.df, split == F)
 ###END###
