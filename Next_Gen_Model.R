@@ -29,11 +29,11 @@ spectra <- lapply(spectra, function(x){
 )
 
 ##[UNDECIDED]Round Wavenumber Values##
-spectra <- lapply(spectra, function(x){
-  x$Wavenumber <- round(x$Wavenumber)
-  return(x)
-}
-)
+#spectra <- lapply(spectra, function(x){
+#  x$Wavenumber <- round(x$Wavenumber)
+#  return(x)
+#}
+#)
 
 #Add ATR Data
 spectra <- sapply(file_names,
@@ -153,7 +153,7 @@ lapply(names(spectra), function(x){
 )
 ###END###
 
-#####[Deprecated]Plot Normalized Absorbance ATR Spectra####
+#####[DEPRECATED]Plot Normalized Absorbance ATR Spectra####
 lapply(names(spectra), function(x){
   tmp <- data.frame(spectra[[x]][1], spectra[[x]][4] )
   plot(tmp,
@@ -251,14 +251,10 @@ MIR <- as.matrix(spectra_avg)
 MIR <- t(MIR)
 spectra.df$MIR <- MIR
 ###END###
-####[UNDECIDED]Add Molecular Weight Tag####
-spectra.df$MW <- c(1,0,1,1,1,1,1,1,1,1,1,0,0,1,1,1,0,0,1,1,1,1,1,0,1,1,1)
-###END###
-
 
 ####Calculate Second Derivative for Peak Assignment####
 #Note: n = 7 was found to best capture peaks in absorbance, with find_peaks tolerance (below)
-# set to m = 5.  However this might be overfitting so we will go with the following:
+# set to m = 5.  However this might be overfitting so we will use n = 11:
 
 MIR.deriv <- apply(spectra.df$MIR, 
                    MARGIN = 1, 
@@ -282,42 +278,34 @@ find_peaks <- function (x, m = 3){
   pks
 }
 
-#Plot All Spectra
-#matplot(wavenumbers,
-#        t(MIR.deriv),
-#        type = "l",
-#        xlim = c(1800,650)
-#)
-
 #Create a List of All Peaks Calculated for 2nd Derivative Spectra
-peaks.list <- apply(spectra.df$MIR.deriv, MARGIN = 1, function(i)wavenumbers[find_peaks(-i, m = 4),]) 
+peaks.list <- apply(
+  spectra.df$MIR.deriv, 
+  MARGIN = 1, 
+  function(i)wavenumbers[find_peaks(-i, m = 4),]
+  ) 
 
 #Retain Only Region Below 1800 cm-1
 peaks.list <- lapply(peaks.list, function(i)i[which(i < 1800)])
 
 #Extract Peaks for One Compound
-#lignin_HMW_peaks <- peaks.list$May5_Lignin_HMW[peaks.list$May5_Lignin_HMW < 1800]
+#TNOM_HMW_peaks <- peaks.list$`Apr6_TPC_1-0-0_HMW`
+#CNOM_HMW_peaks <- peaks.list$`Mar30_TPC_0-0-1_HMW`
+#PNOM_HMW_peaks <- peaks.list$`Mar22_TPC_0-1-0_HMW`
 
-#Plot Single 2nd Derivative Spectrum
-matplot(wavenumbers,
-        spectra.df$MIR.deriv["May5_Lignin_HMW",],
-        type = "l",
-        xlim = c(1800,650),
-        main = "May5_Lignin_HMW"
-)
-minor.tick(nx = 4)
+#write.csv(c(TNOM_HMW_peaks, PNOM_HMW_peaks, CNOM_HMW_peaks), "peaks.csv")
 
-#[DEPRECATED]Locate Peaks in 2nd Derivative Spectrum
-#peaks <- wavenumbers[find_peaks(-spectra.df$MIR.deriv["Apr6_TPC_1-0-0_HMW",], m = 4),]
-
-#Plot Found Peaks Against Absorbance Spectrum
-#plot(wavenumbers[,1],
-#     spectra_avg$`Apr6_TPC_1-0-0_HMW`,
-#     type = "l",
-#     xlim = c(1800, 650))
-
-#minor.tick(nx = 4)
-#abline(v = peaks.list$`Apr6_TPC_1-0-0_HMW`, col = "red")
+#Plot 2nd Derivative Spectra of All Compounds
+for (i in colnames(spectra_avg)){
+  plot(wavenumbers[,1],
+       spectra.df$MIR.deriv[i,],
+       type = "l",
+       xlim = c(1800, 650),
+       main = i
+  )
+  minor.tick(nx = 4)
+  abline(v = peaks.list[[i]], col = "red")
+}
 
 #Plot Found Peaks Against Absorbance Spectrum for All Compounds
 for (i in colnames(spectra_avg)){
@@ -330,8 +318,6 @@ for (i in colnames(spectra_avg)){
   minor.tick(nx = 4)
   abline(v = peaks.list[[i]], col = "red")
 }
-
-#write.csv(round(peaks[which(peaks < 1800)]), file = "Peaks_Apr6_TPC_1-0-0_HMW.csv")
 
 ###END###
 
@@ -363,7 +349,7 @@ spectra.df$MIR <- spectra.df$MIR[, c(cm3600_2200, cm1900_650)]
 set.seed(123)
 split <- sample.split(spectra.df$Kd, SplitRatio = 0.7)
 
-#train <- spectra.df
+train <- spectra.df
 train <- subset(spectra.df, split == T)
 test <- subset(spectra.df, split == F)
 ###END###
@@ -423,10 +409,10 @@ coef1 <- coef(plsr.fit, intercept = TRUE, ncomp = 1)[[1]]
 predict(plsr.fit, ncomp = 3, newdata = test)
 
 #Store Predicted Values as log-Untransformed
-predicted_values <- 10^predict(plsr.fit, ncomp = 3, newdata = test)
+predicted_values <- 10^predict(plsr.fit, ncomp = 2, newdata = test)
 
-plot(predicted_values,
-     10^test[,1],
+plot(test[,1],
+     predicted_values,
      type = "p",
      asp = 1,
      axes = FALSE
@@ -437,18 +423,21 @@ axis(2, pos=0)
 
 
 #Plot fit for training data
-plot(plsr.fit, ncomp = 3, line = TRUE,
+plot(plsr.fit, ncomp = 2, line = TRUE,
      xlim = c(1, 4),
      ylim = c(1, 4))#,
+     labels = "numbers")
      #axes = FALSE
 #)
 #axis(1, pos=0)
 #axis(2, pos=0)
 
-text(x = spectra.df[,1], 
-     y = plsr.fit[[9]][28:54], 
-     labels = paste(gsub("_.*","", names(plsr.fit[[2]][,2]))), 
-     pos = 3
+
+#Add labels
+text(x = train[,2], 
+     y = plsr.fit[[9]][33:65], 
+     labels = paste(gsub("_.*","", names(plsr.fit[[2]][,2])))#, 
+     #pos = 3
 )
 
 #Obtain Predicted KD values of Training Data
@@ -457,7 +446,7 @@ predict(plsr.fit, ncomp = 3)
 #Predict KD values of Test Data
 predict(plsr.fit, ncomp = 3, newdata = test)
 
-plot(plsr.fit, ncomp = 3, line = TRUE, newdata = test,
+plot(plsr.fit, ncomp = 2, line = TRUE, newdata = test,
      xlim = c(1,4),
      ylim = c(1,4)
      )
