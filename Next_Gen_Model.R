@@ -102,7 +102,8 @@ colnames(spectra_avg) <- file_names
 ####Add Compounds + Kd values to Target Variables.csv if necessary####
 #Write the file names of compounds to csv
 write.csv(file_names, file = "File Names.csv")
-#Manually copy file names to Target Variables.csv and add in Kd data 
+
+## -> Manually copy file names to Target Variables.csv and add in Kd data 
 
 #Load Target Variables Data
 Targets <- read.csv("Target Variables.csv", sep = ",", row.names = 1)
@@ -357,7 +358,7 @@ test <- subset(spectra.df, split == F)
 
 ####Run Model on Full Spectrum####
 plsr.fit <- plsr(logKd ~ MIR,
-                     ncomp = 5,
+                     ncomp = 4,
                      data = train,
                      validation = "CV",
                      scale = FALSE,
@@ -368,10 +369,12 @@ plsr.fit <- plsr(logKd ~ MIR,
 summary(plsr.fit)
 
 plot(RMSEP(plsr.fit))
+####END####
 
+####Plot the Scores####
 plot(plsr.fit, plottype = "scores", comps = 1:3, labels = "numbers")
 
-#For only one component, plot u vs. t
+##If only one component selected, plot u vs. t
 plot(plsr.fit[[2]][,1], 
      plsr.fit[[4]][,1],
      xlab = "t",
@@ -383,32 +386,65 @@ text(x = plsr.fit[[2]][,1],
      labels = paste(gsub("_.*","", names(plsr.fit[[2]][,1]))), 
      pos = 3
 )
-     
-##Plot the coefficients
+####END####
+
+####Plot the Model-Fitted Coefficients####
 plot(plsr.fit[[1]],
      type = "l")
 
-#For one component only
+##Plot Coefficients at Specific no. Components
+#Choose Number of Components
+Num.components <- 2
+
 plot(wavenumbers[c(cm3600_2200, cm1900_650), ],
-     plsr.fit[[1]][(1422*3):((1422*3)+1421)],
+     plsr.fit[[1]][(1422*Num.components):((1422*Num.components)+1421)],
      type = "l",
      xlim = c(3600,650),
      xlab = "Wavenumber",
      ylab = "Coefficient",
-     main = "Regression Coefficients by Wavenumber"
+     main = paste(c("Regression Coefficients by Wavenumber", Num.components, "Components"))
      )
 abline(h = 0)
 minor.tick(nx = 5)
+####END####
 
-##Test to see if coefficients are indeed the regression coefficients Y onto X
+####Test to see if coefficients are indeed the regression coefficients Y onto X####
 #Account for mean centering by calculating the intercept to add
 coef1 <- coef(plsr.fit, intercept = TRUE, ncomp = 1)[[1]]
 
 (test$MIR)%*%plsr.fit[[1]][1:1422]+coef1 
 
-predict(plsr.fit, ncomp = 3, newdata = test)
+predict(plsr.fit, ncomp = 1, newdata = test)
+####END####
 
-#Store Predicted Values as log-Untransformed
+#####Plot Fit for Training Data####
+plot(plsr.fit, ncomp = 2, line = TRUE,
+     xlim = c(1, 4),
+     ylim = c(1, 4))#,
+labels = "numbers")
+#axes = FALSE
+#)
+#axis(1, pos=0)
+#axis(2, pos=0)
+
+#Add labels
+text(x = train[,2], 
+     y = plsr.fit[[9]][33:65], 
+     labels = paste(gsub("_.*","", names(plsr.fit[[2]][,2])))#, 
+     #pos = 3
+)
+####END####
+
+####Fit of Test Data####
+plot(plsr.fit, ncomp = 2, line = TRUE, newdata = test,
+     xlim = c(1,4),
+     ylim = c(1,4)
+)
+
+RMSEP(plsr.fit, ncomp = 2, newdata = test)
+####END####
+
+####Compare Predicted vs. Actual Kd Values of Test Set as log-Untransformed####
 predicted_values <- 10^predict(plsr.fit, ncomp = 2, newdata = test)
 
 plot(test[,1],
@@ -420,25 +456,8 @@ plot(test[,1],
 abline( a = 0, b = 1)
 axis(1, pos=0)
 axis(2, pos=0)
+####END####
 
-
-#Plot fit for training data
-plot(plsr.fit, ncomp = 2, line = TRUE,
-     xlim = c(1, 4),
-     ylim = c(1, 4))#,
-     labels = "numbers")
-     #axes = FALSE
-#)
-#axis(1, pos=0)
-#axis(2, pos=0)
-
-
-#Add labels
-text(x = train[,2], 
-     y = plsr.fit[[9]][33:65], 
-     labels = paste(gsub("_.*","", names(plsr.fit[[2]][,2])))#, 
-     #pos = 3
-)
 
 #Obtain Predicted KD values of Training Data
 predict(plsr.fit, ncomp = 3)
@@ -446,12 +465,6 @@ predict(plsr.fit, ncomp = 3)
 #Predict KD values of Test Data
 predict(plsr.fit, ncomp = 3, newdata = test)
 
-plot(plsr.fit, ncomp = 2, line = TRUE, newdata = test,
-     xlim = c(1,4),
-     ylim = c(1,4)
-     )
-
-RMSEP(plsr.fit, ncomp = 3, newdata = test)
 
 #Plot Loadings of First Three Components
 plot(plsr.fit, 
@@ -467,39 +480,41 @@ minor.tick(nx = 5)
 
 
 ####Build Dataframe of Test Prediction Errors for Later Use####
-RMSEP. <- data.frame(
-  alex.RMSEP(model = plsr.fit, data = test, target = "XlogP3")
+#Homemade RMSEP Function
+alex.RMSEP <- function(model, data, target){
+  temp <- data.frame(predict(model, newdata = data))
+  temp <- temp - data[[target]]
+  temp[,] <- temp[,]^2
+  temp <- colSums(temp)
+  temp <- temp/length(data[[target]])
+  temp <- sqrt(temp)
+}
+
+RMSEP.table <- data.frame(
+  alex.RMSEP(model = plsr.fit, data = test, target = "logKd")
 )
 
-colnames(RMSEP.) <- "Full"
+colnames(RMSEP.table) <- "Full Spectrum"
 
 #Compare homebrew RMSEP to Package RMSEP function on Full Spectrum Model
-RMSEP.$Full.Stock <- t(data.frame(
-  RMSEP(plsr.fit, estimate = "test", newdata = test, intercept = FALSE)$val)
-)
-###END###
-
+#RMSEP.table$Full.Stock <- t(data.frame(
+#  RMSEP(plsr.fit, estimate = "test", newdata = test, intercept = FALSE)$val)
+#)
+####END####
 
 ####Moving Window Partial Least Squares####
-##Set Total Number of Spectral Points (Full or w/o CO2)
-
-#total.points <- length(spectra.df$MIR[1,])
-total.points <- length(region.df$MIR[1,])
-
-##Set the Wavenumber Scale (Full or w/o CO2)
-
-#wavenumbers <- as.vector(spectra[[1]][1])
-wavenumbers <- data.frame(wavenumbers[c(cm3600_2200, cm1900_650), ])
+##Set Total Number of Spectral Points (i.e w/o CO2)
+total.points <- length(spectra.df$MIR[1,])
 
 #Create an object to store the results
 residues <- NULL
 
 for(i in 1:(total.points - 4)){
   #Set the midpoint of the moving window of 5 spectral points
-  midpoint <- wavenumbers[(i+2), ]
+  midpoint <- wavenumbers_NoCO2[i+2]
   
   #Train the Model on Scaled Absorbance Data
-  mwindow.fit <- plsr(XlogP3 ~ MIR[ ,i:(i+4)],
+  mwindow.fit <- plsr(logKd ~ MIR[ ,i:(i+4)],
                       ncomp = 3, 
                       data = train, 
                       validation = "none", 
@@ -522,7 +537,7 @@ for(i in 1:(total.points - 4)){
 matplot(residues$midpoint, 
         log10(residues[,-1]), 
         type = "l", 
-        ylim = c(2.05, 2.45), 
+        xlim = c(3600,650), 
         lty = 1,
         ylab = "log(RSS)",
         xlab = "Wavenumber"
@@ -534,14 +549,14 @@ title(main = "Traces des Residus, Taille de Fenêtre = 5")
 ####Define Windows####
 #Window 1
 #Define Spectral Region 1
-window.1 <- which(between(wavenumbers[[1]], 1100, 1350) == TRUE)
+window.1 <- which(between(wavenumbers_NoCO2, 2800, 3600) == TRUE)
 
 #Fit PLS
 #Train the Model on Windows of Absorbance Data
-window1.fit <- plsr(XlogP3 ~ MIR[ , window.1],
-                        ncomp = 10, 
+window1.fit <- plsr(logKd ~ MIR[ , window.1],
+                        ncomp = 4, 
                         data = train, 
-                        validation = "LOO", 
+                        validation = "CV", 
                         scale = FALSE, 
                         center = TRUE,
                         method = "simpls"
@@ -553,14 +568,14 @@ RMSEP(window1.fit)
 
 #Window 2
 #Define Spectral Region 2
-window.2 <- which(between(wavenumbers[[1]], 1350, 1600) == TRUE)
+window.2 <- which(between(wavenumbers_NoCO2, 1400, 1850) == TRUE)
 
 #Fit PLS
 #Train the Model on Windows of Absorbance Data
-window2.fit <- plsr(XlogP3 ~ MIR[ , window.2],
-                    ncomp = 10, 
+window2.fit <- plsr(logKd ~ MIR[ , window.2],
+                    ncomp = 4, 
                     data = train, 
-                    validation = "LOO", 
+                    validation = "CV", 
                     scale = FALSE, 
                     center = TRUE,
                     method = "simpls"
@@ -572,73 +587,93 @@ RMSEP(window2.fit)
 
 #Window 3
 #Define Spectral Region 2
-window.3 <- which(between(wavenumbers[[1]], 2500, 3200) == TRUE)
+window.3 <- which(between(wavenumbers_NoCO2, 1100, 1400) == TRUE)
 
 #Fit PLS
 #Train the Model on Windows of Absorbance Data
-window3.fit <- plsr(XlogP3 ~ MIR[ , window.3],
-                    ncomp = 10, 
+window3.fit <- plsr(logKd ~ MIR[ , window.3],
+                    ncomp = 4, 
                     data = train, 
-                    validation = "LOO", 
+                    validation = "CV", 
                     scale = FALSE, 
                     center = TRUE,
                     method = "simpls"
 )
 
-#Calculate RMSEP Window 2
+#Calculate RMSEP Window 3
 plot(RMSEP(window3.fit))
 RMSEP(window3.fit)
 
+#Window 4
+#Define Spectral Region 4
+window.4 <- which(between(wavenumbers_NoCO2, 650, 1100) == TRUE)
+
+#Fit PLS
+#Train the Model on Windows of Absorbance Data
+window4.fit <- plsr(logKd ~ MIR[ , window.4],
+                    ncomp = 4, 
+                    data = train, 
+                    validation = "CV", 
+                    scale = FALSE, 
+                    center = TRUE,
+                    method = "simpls"
+)
+
+#Calculate RMSEP Window 4
+plot(RMSEP(window4.fit))
+RMSEP(window4.fit)
+
 #Build Model on all windows combined
-combined.fit <- plsr(XlogP3 ~ 
+combined.fit <- plsr(logKd ~ 
                        MIR[ , window.1] + 
                        MIR[ , window.2] +
-                       MIR[ , window.3],
-                     ncomp = 10,
+                       MIR[ , window.3] +
+                       MIR[ , window.4],
+                     ncomp = 4,
                      data = train, 
-                     validation = "LOO",
+                     validation = "CV",
                      scale = FALSE, 
                      center = TRUE,
                      method = "simpls"
 )
 ####END####
 
-####RMSEC Data Comparison####
+####RMSEC Data Comparison for Optimal Window Selection####
 #Combine Calibration Prediction Data of all Models for Comparison
-RMSEC. <- t(data.frame(RMSEP(truncated.fit, estimate = "CV", intercept = FALSE)$val))
+RMSEC.table <- t(data.frame(RMSEP(plsr.fit, estimate = "CV", intercept = FALSE)$val))
 
-RMSEC. <- data.frame(RMSEC.)
+RMSEC.table <- data.frame(RMSEC.table)
 
-colnames(RMSEC.)[colnames(RMSEC.) == "CV"] <- "Full"
+colnames(RMSEC.table)[colnames(RMSEC.table) == "CV"] <- "Full"
 
-#RMSEC.$Truncated <- t(
-#  data.frame(RMSEP(truncated.fit, estimate = "CV", intercept = FALSE)$val)
-#)
-
-RMSEC.$MovingWindow <- t(
+RMSEC.table$MovingWindow <- t(
   data.frame(RMSEP(combined.fit, estimate = "CV", intercept = FALSE)$val)
 )
 
-RMSEC.$Window1 <- t(
+RMSEC.table$Window1 <- t(
   data.frame(RMSEP(window1.fit, estimate = "CV", intercept = FALSE)$val)
 )
 
-RMSEC.$Window2 <- t(
+RMSEC.table$Window2 <- t(
   data.frame(RMSEP(window2.fit, estimate = "CV", intercept = FALSE)$val)
 )
 
-RMSEC.$Window3 <- t(
+RMSEC.table$Window3 <- t(
   data.frame(RMSEP(window3.fit, estimate = "CV", intercept = FALSE)$val)
 )
-  
+
+RMSEC.table$Window4 <- t(
+  data.frame(RMSEP(window4.fit, estimate = "CV", intercept = FALSE)$val)
+)
+####END####
 
 ####CSMWPLS on Base Region####
-#Based on RMSEC curve, ideal no. components should be __
+##Based on RMSEC curve, ideal no. components should be __
 
-##CSMWPLS on Base Region (Window 3)
+##CSMWPLS on Base Region (Window _)
 
 #Select window
-window <- window.3
+window <- window.4
 
 #Clear container
 CSMWPLS <- NULL
@@ -652,11 +687,11 @@ for(w in 4:length(window)){
   
   for(j in 1:span){
     #Train the Model on Scaled Absorbance Data
-    base1.fit <- plsr(XlogP3 ~ 
+    base1.fit <- plsr(logKd ~ 
                         MIR[ , window[j]:window[j + w - 1]],
-                      ncomp = 1, 
+                      ncomp = Num.components, 
                       data = train, 
-                      validation = "LOO", 
+                      validation = "CV", 
                       scale = FALSE, 
                       center = TRUE,
                       method = "simpls"
@@ -675,9 +710,9 @@ for(w in 4:length(window)){
     
     colnames(temp.matrix) <- print(
       paste(
-        wavenumbers[window[j], ],
+        wavenumbers_NoCO2[window[j]],
         "-",
-        wavenumbers[window[j + w - 1], ]
+        wavenumbers_NoCO2[window[j + w - 1]]
       )
     ) 
     
@@ -693,37 +728,28 @@ which.min(CSMWPLS[1,])
 
 CSMWPLS[, which.min(CSMWPLS[1,])]
 
-Base.Region <- which(between(wavenumbers[[1]], 3012, 3017) == TRUE)
+Base.Region <- which(between(wavenumbers_NoCO2, 1039, 1046) == TRUE)
 
 set.seed(123)
 #Run PLSR on Base Region and Append for General Comparison
-base1.fit <- plsr(XlogP3 ~ MIR[ , Base.Region],
-                        ncomp = 3, 
+base1.fit <- plsr(logKd ~ MIR[ , Base.Region],
+                        ncomp = 4, 
                         data = train, 
-                        validation = "LOO", 
+                        validation = "CV", 
                         scale = FALSE, 
                         center = TRUE,
                         method = "simpls"
 )
 
-
-
-#for(i in length(RMSEC.[[1]])){
-#  temp <- t(data.frame(
-#    RMSEP(Base.Region.fit, estimate = "CV", intercept = FALSE)$val
-#    ))
-#  c
-#}
-
-RMSEC.$Base.Region <- t(
-  data.frame(RMSEP.$val)
+RMSEC.table$Base.Region <- t(
+  data.frame(RMSEP(base1.fit, estimate = "CV", intercept = FALSE)$val)
 )
 ####END####
 
 ####SCSMWPLS on Base Region + Window_####
 
-#Select window
-window <- window.1 
+#Select next window
+window <- window.2 
 
 #Clear container
 CSMWPLS <- NULL
@@ -737,12 +763,12 @@ for(w in 4:length(window)){
   
   for(j in 1:span){
     #Train the Model on Scaled Absorbance Data
-    base12.fit <- plsr(XlogP3 ~ 
+    base12.fit <- plsr(logKd ~ 
                          MIR[ , Base.Region] +
                          MIR[ , window[j]:window[j + w - 1]],
-                       ncomp = 1, 
+                       ncomp = 2, 
                        data = train, 
-                       validation = "LOO", 
+                       validation = "CV", 
                        scale = FALSE, 
                        center = TRUE,
                        method = "simpls"
@@ -761,9 +787,9 @@ for(w in 4:length(window)){
     
     colnames(temp.matrix) <- print(
       paste(
-        wavenumbers[window[j], ],
+        wavenumbers_NoCO2[window[j]],
         "-",
-        wavenumbers[window[j + w - 1], ]
+        wavenumbers_NoCO2[window[j + w - 1]]
       )
     ) 
     
@@ -779,13 +805,13 @@ which.min(CSMWPLS[1,])
 
 CSMWPLS[, which.min(CSMWPLS[1,])]
 
-Base.Region2 <- which(between(wavenumbers[[1]], 1159, 1165) == TRUE)
+Base.Region2 <- which(between(wavenumbers_NoCO2, 1429, 1532) == TRUE)
 
 #Run PLSR on Base Region 1 & 2 and Append for General Comparison
-base12.fit <- plsr(XlogP3 ~ MIR[ , Base.Region] + MIR[ , Base.Region2],
-                           ncomp = 8, 
+base12.fit <- plsr(logKd ~ MIR[ , Base.Region] + MIR[ , Base.Region2],
+                           ncomp = 4, 
                            data = train, 
-                           validation = "LOO", 
+                           validation = "CV", 
                            scale = FALSE, 
                            center = TRUE,
                            method = "simpls"
@@ -794,14 +820,14 @@ base12.fit <- plsr(XlogP3 ~ MIR[ , Base.Region] + MIR[ , Base.Region2],
 #Strip the "MIR[]" off of the returned dimension names for easier plotting later
 dimnames(Base.Region1.2.fit[[3]])[[1]] <- gsub(".*]", "", dimnames(Base.Region1.2.fit[[3]])[[1]])
 
-RMSEC.$Base.Region1.2 <- t(
+RMSEC.table$Base.Region12 <- t(
   data.frame(RMSEP(base12.fit, estimate = "CV", intercept = FALSE)$val)
 )
 ####END####
 
-####SCSMWPLS on Base Region1.2 + Window _####
+####SCSMWPLS on Base Region12 + Window _####
 #Select window
-window <- window.2
+window <- window.3
 
 #Clear container
 CSMWPLS <- NULL
@@ -815,14 +841,14 @@ for(w in 4:length(window)){
   
   for(j in 1:span){
     #Train the Model on Scaled Absorbance Data
-    base123.fit <- plsr(XlogP3 ~ 
+    base123.fit <- plsr(logKd ~ 
                           MIR[ , Base.Region] +
                           MIR[ , Base.Region2] +
                           MIR[ , window[j]:
                                  window[j + w - 1]],
-                        ncomp = 1, 
+                        ncomp = 2, 
                         data = train, 
-                        validation = "LOO", 
+                        validation = "CV", 
                         scale = FALSE, 
                         center = TRUE,
                         method = "simpls"
@@ -841,9 +867,9 @@ for(w in 4:length(window)){
     
     colnames(temp.matrix) <- print(
       paste(
-        wavenumbers[window[j], ],
+        wavenumbers_NoCO2[window[j]],
         "-",
-        wavenumbers[window[j + w - 1], ]
+        wavenumbers_NoCO2[window[j + w - 1]]
       )
     ) 
     
@@ -859,16 +885,16 @@ which.min(CSMWPLS[1,])
 
 CSMWPLS[, which.min(CSMWPLS[1,])]
 
-Base.Region3 <- which(between(wavenumbers[[1]], 1411, 1418) == TRUE)
+Base.Region3 <- which(between(wavenumbers_NoCO2, 1328, 1357) == TRUE)
 
 #Run PLSR on Base Region 123 and Append for General Comparison
-base123.fit <- plsr(XlogP3 ~ 
+base123.fit <- plsr(logKd ~ 
                       MIR[ , Base.Region] + 
                       MIR[ , Base.Region2] +
                       MIR[ , Base.Region3],
-                    ncomp = 10, 
+                    ncomp = 4, 
                     data = train, 
-                    validation = "LOO", 
+                    validation = "CV", 
                     scale = FALSE, 
                     center = TRUE,
                     method = "simpls"
@@ -877,29 +903,117 @@ base123.fit <- plsr(XlogP3 ~
 #Strip the "MIR[]" off of the returned dimension names for easier plotting later
 dimnames(Base.Region1.2.fit[[3]])[[1]] <- gsub(".*]", "", dimnames(Base.Region1.2.fit[[3]])[[1]])
 
-RMSEC.$Base.Region1.2.3 <- t(
+RMSEC.table$Base.Region123 <- t(
   data.frame(RMSEP(base123.fit, estimate = "CV", intercept = FALSE)$val)
+)
+####END####
+
+####SCSMWPLS on Base Region123 + Window _####
+#Select window
+window <- window.1
+
+#Clear container
+CSMWPLS <- NULL
+
+set.seed(123)
+#Set size of moving window
+for(w in 4:length(window)){
+  
+  #Factor region by window size to determine no. windows that span it
+  span <- length(window) - w + 1
+  
+  for(j in 1:span){
+    #Train the Model on Scaled Absorbance Data
+    base1234.fit <- plsr(logKd ~ 
+                          MIR[ , Base.Region] +
+                          MIR[ , Base.Region2] +
+                          MIR[ , Base.Region3] +
+                          MIR[ , window[j]:
+                                 window[j + w - 1]],
+                        ncomp = 2, 
+                        data = train, 
+                        validation = "CV", 
+                        scale = FALSE, 
+                        center = TRUE,
+                        method = "simpls"
+    )
+    
+    #Extract the Residual Sum of Squares for the Fit (RSS)
+    RSS <- RMSEP(base123.fit, estimate = "CV", intercept = "TRUE")
+    RSS <- RSS$val
+    
+    #Extract the minimum RMSEP and its associated number of LV's
+    LV <- which.min(RSS)
+    
+    .RMSEP <- min(RSS)
+    
+    temp.matrix <- rbind(.RMSEP, LV)
+    
+    colnames(temp.matrix) <- print(
+      paste(
+        wavenumbers_NoCO2[window[j]],
+        "-",
+        wavenumbers_NoCO2[window[j + w - 1]]
+      )
+    ) 
+    
+    #Append Data to Dataframe
+    CSMWPLS <- cbind(CSMWPLS, temp.matrix )
+    
+    rm(temp.matrix)
+  }
+}
+
+#Query for Spectral Window of lowest RMSEP 
+which.min(CSMWPLS[1,])                              
+
+CSMWPLS[, which.min(CSMWPLS[1,])]
+
+Base.Region4 <- which(between(wavenumbers_NoCO2, 3593, 3599) == TRUE)
+
+#Run PLSR on Base Region 1234 and Append for General Comparison
+base1234.fit <- plsr(logKd ~ 
+                      MIR[ , Base.Region] + 
+                      MIR[ , Base.Region2] +
+                      MIR[ , Base.Region3] +
+                      MIR[ , Base.Region4],
+                    ncomp = 4, 
+                    data = train, 
+                    validation = "CV", 
+                    scale = FALSE, 
+                    center = TRUE,
+                    method = "simpls"
+)
+
+#Strip the "MIR[]" off of the returned dimension names for easier plotting later
+dimnames(Base.Region1.2.fit[[3]])[[1]] <- gsub(".*]", "", dimnames(Base.Region1.2.fit[[3]])[[1]])
+
+RMSEC.table$Base.Region1234 <- t(
+  data.frame(RMSEP(base1234.fit, estimate = "CV", intercept = FALSE)$val)
 )
 ####END####
 
 ####Compare Predictive Values of Each Fitting Model####
 
-RMSEP.$Truncated <- alex.RMSEP(model = truncated.fit, data = test, target = "XlogP3") 
+#RMSEP.$Truncated <- alex.RMSEP(model = truncated.fit, data = test, target = "XlogP3") 
 
-RMSEP.$MovingWindow <- alex.RMSEP(model = combined.fit, data = test, target = "XlogP3") 
+RMSEP.table$MovingWindow <- alex.RMSEP(model = combined.fit, data = test, target = "logKd") 
 
-RMSEP.$Window1 <- alex.RMSEP(model = window1.fit, data = test, target = "XlogP3")
+RMSEP.table$Window1 <- alex.RMSEP(model = window1.fit, data = test, target = "logKd")
 
-RMSEP.$Window2 <- alex.RMSEP(model = window2.fit, data = test, target = "XlogP3")
+RMSEP.table$Window2 <- alex.RMSEP(model = window2.fit, data = test, target = "logKd")
 
-RMSEP.$Window3 <- alex.RMSEP(model = window3.fit, data = test, target = "XlogP3")
+RMSEP.table$Window3 <- alex.RMSEP(model = window3.fit, data = test, target = "logKd")
 
-RMSEP.$Base1 <- alex.RMSEP(model = base1.fit, data = test, target = "XlogP3")
+RMSEP.table$Base1 <- alex.RMSEP(model = base1.fit, data = test, target = "logKd")
 
-RMSEP.$Base12 <- alex.RMSEP(model = base12.fit, data = test, target = "XlogP3")
+RMSEP.table$Base12 <- alex.RMSEP(model = base12.fit, data = test, target = "logKd")
 
-RMSEP.$Base123 <- alex.RMSEP(model = base123.fit, data = test, target = "XlogP3")
+RMSEP.table$Base123 <- alex.RMSEP(model = base123.fit, data = test, target = "logKd")
 
+RMSEP.table$Base1234 <- alex.RMSEP(model = base1234.fit, data = test, target = "logKd")
+
+#### ->Left off here on June 9
 
 #Plot the line of Measured vs. Best Prediction
 plot(base123.fit, ncomp = 1, asp = 1, line = TRUE, newdata = test)
