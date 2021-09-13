@@ -17,8 +17,9 @@ peaks.list <- apply(
 
 #Retain Only Region Below 1800 cm-1
 peaks.list <- lapply(peaks.list, function(i)i[which(i < 1800)])
+####END####
 
-#Extract Peaks for End-Members
+####Extract Peaks for HMW End-Members####
 #TNOM HMW
 TNOM_HMW_peaks <- peaks.list$`Apr06_TPC_1-0-0_HMW`
 
@@ -87,33 +88,36 @@ minor.tick(nx = 4)
 abline(v = PNOM_HMW_peaks, col = "red")
 #Triage Peaks by Eye
 PNOM_HMW_peaks <- c(PNOM_HMW_peaks[c(5,12,13,16,23,25,29,30,35,39,40)],1637,1543,1458,1397,1047,975)
+####END####
 
-#TNOM LMW
+####Extract Peaks for LMW End-Members####
 TNOM_LMW_peaks <- peaks.list$`Apr08_TPC_1-0-0_LMW`
 #Plot 
 plot(wavenumbers[,1],
-     spectra_avg$`Apr08_TPC_1-0-0_LMW`,
+     smoothed_spectra$`Apr08_TPC_1-0-0_LMW`,
      type = "l",
-     xlim = c(1800, 650),
+     xlim = c(3600, 900),
      main = "Apr08_TPC_1-0-0_LMW"
 )
 
-minor.tick(nx = 4)
+minor.tick(nx = 5)
 abline(v = TNOM_LMW_peaks, col = "red")
 #Triage Peaks by Eye
 TNOM_LMW_peaks <- c(TNOM_LMW_peaks[c(3,9,23,26,28:31,33,38,40)],1433,1370)
+TNOM_LMW_peaks[16]
 
 #CNOM LMW
 CNOM_LMW_peaks <- peaks.list$`Apr12_TPC_0-0-1_LMW`
 #Plot 
 plot(wavenumbers[,1],
-     spectra_avg$`Apr12_TPC_0-0-1_LMW`,
+     #spectra_avg$`Apr12_TPC_0-0-1_LMW`,
+     smoothed_spectra$`Apr12_TPC_0-0-1_LMW`,
      type = "l",
-     xlim = c(1800, 650),
+     xlim = c(3600, 900),
      main = "Apr12_TPC_0-0-1_LMW"
 )
 
-minor.tick(nx = 4)
+minor.tick(nx = 5)
 abline(v = CNOM_LMW_peaks, col = "coral", lty = 2)
 #Triage Peaks by Eye
 CNOM_LMW_peaks <- c(CNOM_LMW_peaks[c(6,9,11,14,17,20,23,27,31,36,37,39,44,45)],1108)
@@ -122,9 +126,10 @@ CNOM_LMW_peaks <- c(CNOM_LMW_peaks[c(6,9,11,14,17,20,23,27,31,36,37,39,44,45)],1
 PNOM_LMW_peaks <- peaks.list$`Apr09_TPC_0-1-0_LMW`
 #Plot 
 plot(wavenumbers[,1],
-     spectra_avg$`Apr09_TPC_0-1-0_LMW`,
+     smoothed_spectra$`Apr09_TPC_0-1-0_LMW`,
+     #spectra_avg$`Apr09_TPC_0-1-0_LMW`,
      type = "l",
-     xlim = c(1800, 650),
+     xlim = c(3600, 900),
      main = "Apr09_TPC_0-1-0_LMW"
 )
 
@@ -201,20 +206,71 @@ for (i in colnames(spectra_avg)){
 }
 ####END####
 
-####Plot HMW Fingerprint Region####
-#Graphically parameter reset
+####Plot Regression Coefficients####
+#Choose Number of Components
+Num.components <- 9
+
+#Graphical parameter reset
 dev.off()
 #or
 par(mfrow=c(1,1))
 
 par(mar=c(0.5, 0.5, 0.2, 0.2), 
     mfrow=c(1,2),
-    oma = c(5, 5, 0.2, 0.2)
+    oma = c(5, 5, 3, 0.5)
+)
+layout(matrix(c(1,2,2), nrow = 1, ncol = 3))
+
+
+plot(wavenumbers_NoCO2,
+     plsr.fit$coefficients[,1,Num.components],
+     type = "l",
+     xlim = c(3600,2300),
+     xlab = NA,
+     #xlab = expression("Wavenumber (cm"^-1*")"),
+     ylab = "Coefficient"#,
+     #main = paste(c("Regression Coefficients by Wavenumber", Num.components, "Components"))
+)
+abline(h = 0, col = "blue")
+#minor.tick(nx = 5)
+
+abline(v = c(3386,3146,2922), 
+       col = "coral", lty = 2)
+
+plot(wavenumbers_NoCO2,
+     plsr.fit$coefficients[,1,Num.components],
+     type = "l",
+     xlim = c(1900,900),
+     xlab = NA,
+     #xlab = expression("Wavenumber (cm"^-1*")"),
+     #ylab = "Coefficient"#,
+     yaxt = "n",
+     ylab = "",
+     #main = paste(c("Regression Coefficients by Wavenumber", Num.components, "Components"))
+)
+abline(h = 0, col = "blue")
+
+abline(v = c(1720,1657,1577,1435,1388,1288,1232,1159,1109,1023,984), 
+       col = "coral", lty = 2)
+####END####
+
+####Plot HMW Fingerprint Region####
+smoothed_spectra <- data.frame(MIR.smooth, check.names = FALSE)
+
+#Graphical parameter reset
+dev.off()
+#or
+par(mfrow=c(1,1))
+
+par(mar=c(0.5, 0.5, 0.2, 0.2), 
+    mfrow=c(1,2),
+    oma = c(5, 5, 3, 0.2)
 )
 layout(matrix(c(1,2,2), nrow = 1, ncol = 3))
 
 plot(wavenumbers[,1],
-     spectra_avg$`Apr06_TPC_1-0-0_HMW`,
+     smoothed_spectra$`Apr06_TPC_1-0-0_HMW`,
+     #spectra_avg_corr$`Apr06_TPC_1-0-0_HMW`,
      type = "l",
      #xlim = c(1800, 800),
      xlim = c(3600, 2800),
@@ -230,12 +286,12 @@ mtext(expression("Wavenumber"~italic("(cm"^-1*")")),
       line = 2.5
 )
 lines(wavenumbers[,1],
-      spectra_avg$`Mar22_TPC_0-1-0_HMW`+0.5,
+      smoothed_spectra$`Mar22_TPC_0-1-0_HMW`+0.5,
       col = "dark blue"
 )
 
 lines(wavenumbers[,1],
-      spectra_avg$`Mar30_TPC_0-0-1_HMW`+1,
+      smoothed_spectra$`Mar30_TPC_0-0-1_HMW`+1,
       col = "red"
 )
 
@@ -267,10 +323,10 @@ legend("topleft",
 
 #1800-800 Range HMW
 plot(wavenumbers[,1],
-     spectra_avg$`Apr06_TPC_1-0-0_HMW`,
+     smoothed_spectra$`Apr06_TPC_1-0-0_HMW`,
      type = "l",
      #xlim = c(1800, 800),
-     xlim = c(1800, 800),
+     xlim = c(1900, 900),
      ylim = c(0,2.3),
      xlab = expression("Wavenumber (cm"^-1*")"),
      yaxt = "n",
@@ -279,18 +335,18 @@ plot(wavenumbers[,1],
 )
 
 lines(wavenumbers[,1],
-      spectra_avg$`Mar22_TPC_0-1-0_HMW`+0.5,
+      smoothed_spectra$`Mar22_TPC_0-1-0_HMW`+0.5,
       col = "dark blue"
 )
 
 lines(wavenumbers[,1],
-      spectra_avg$`Mar30_TPC_0-0-1_HMW`+1,
+      smoothed_spectra$`Mar30_TPC_0-0-1_HMW`+1,
       col = "red"
 )
 
 minor.tick(nx = 4)
 
-abline(v = c(1630,1576,1560,1511,1448,1397,1314,1239,1124,1038,975), lty = 2, col = "darkgrey")
+abline(v = c(1729,1630,1576,1560,1511,1448,1397,1314,1239,1124,1038,975), lty = 2, col = "darkgrey")
 
 text(x = c(1630,1511,1397,1239,1038), 
      y = 2.3, 
@@ -423,31 +479,45 @@ legend("topleft",
 ####END####
 
 ####Plot LMW Fingerprint Region####
+
+#Graphical parameter reset
+dev.off()
+#or
+par(mfrow=c(1,1))
+
+par(mar=c(0.5, 0.5, 0.2, 0.2), 
+    mfrow=c(1,2),
+    oma = c(5, 5, 3, 0.2)
+)
+layout(matrix(c(1,2,2), nrow = 1, ncol = 3))
+
 plot(wavenumbers[,1],
-     spectra_avg$`Apr08_TPC_1-0-0_LMW`,
+     smoothed_spectra$`Apr08_TPC_1-0-0_LMW`+1.6,
      type = "l",
-     xlim = c(1800, 800),
-     ylim = c(0,2.5),
+     xlim = c(3600, 2300),
+     ylim = c(0,3),
      xlab = expression("Wavenumber (cm"^-1*")"),
      ylab = "Absorbance",
      col = "dark green"
 )
 
 lines(wavenumbers[,1],
-      spectra_avg$`Apr09_TPC_0-1-0_LMW`+0.5,
+      smoothed_spectra$`Apr09_TPC_0-1-0_LMW`,#+0.5,
       col = "dark blue"
 )
 
 lines(wavenumbers[,1],
-      spectra_avg$`Apr12_TPC_0-0-1_LMW`+1.1,
+      smoothed_spectra$`Apr12_TPC_0-0-1_LMW`+0.8,#1.1,
       col = "red"
 )
 
-minor.tick(nx = 4)
+minor.tick(nx = 2)
 
+abline(v = c(3386),lty =2, col = "gray")
 abline(v = c(1762,1654,1636,1570,1508,1408,1370,1120,1108,1049), lty =2, col = "gray")
-#abline(v = c(1762,1683,1654,1636,1570,1560,1542,1508,1458,1433,1408,1398,1371,1355,1191,1120,1108,1049,990,879,865,833,824), lty =2, col = "gray")
+####END###
 
+####Labels LMW####
 text(x = c(1762,1636,1508,1408), 
      y = 2.5, 
      labels = c(1762,1636,1508,1408),
@@ -490,6 +560,30 @@ legend("topleft",
        col = c("red","darkblue","darkgreen"),
        lty = 1,
        bty = "n"
+)
+####END####
+
+#####1800-800 Range LMW####
+plot(wavenumbers[,1],
+     smoothed_spectra$`Apr08_TPC_1-0-0_LMW`+1.6,
+     type = "l",
+     #xlim = c(1800, 800),
+     xlim = c(1900, 900),
+     ylim = c(0,3),
+     xlab = expression("Wavenumber (cm"^-1*")"),
+     yaxt = "n",
+     ylab = "",
+     col = "dark green"
+)
+
+lines(wavenumbers[,1],
+      smoothed_spectra$`Apr09_TPC_0-1-0_LMW`,#+0.5,
+      col = "dark blue"
+)
+
+lines(wavenumbers[,1],
+      smoothed_spectra$`Apr12_TPC_0-0-1_LMW`+0.8,#+1.1,
+      col = "red"
 )
 ####END####
 

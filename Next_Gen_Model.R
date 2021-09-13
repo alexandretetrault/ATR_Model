@@ -67,6 +67,7 @@ salt_spectra <- sapply(salt_file_names,
                        }
 )
 
+#!STOP! -> go to Matrix_Matched.R
 #Transform Transmittance to Absorbance
 salt_spectra <- lapply(salt_spectra, function(x){
   x$Absorbance <- as.vector(
@@ -102,7 +103,7 @@ salt_spectra <- lapply(salt_spectra, function(x){
 )
 
 #Plot Individual Spectra
-wavenumber <- rev(range(salt_spectra[[1]][1]))
+limits <- rev(range(salt_spectra[[1]][1]))
 wavenumbers <- as.vector(salt_spectra[[1]][1])
 
 lapply(names(salt_spectra), function(x) {
@@ -110,7 +111,7 @@ lapply(names(salt_spectra), function(x) {
        #salt_spectra[[x]]$Normalized, 
        salt_spectra[[x]]$Transmittance,
        type = "l", 
-       xlim = wavenumber,
+       xlim = limits,
        main = x
   )
 }
@@ -187,6 +188,7 @@ spectra <- sapply(file_names,
 }
 )
 
+#!STOP! Go to -> Matrix_Matched.R
 #Transform Transmittance to Absorbance
 spectra <- lapply(spectra, function(x){
   x$Absorbance <- as.vector(
@@ -254,6 +256,7 @@ colnames(spectra_avg) <- file_names
 ####END####
 
 ####Correct LMW Spectra Using Matrix-Matched####
+#Make a New Object for Corrected Spectra
 spectra_avg_corr <- spectra_avg
 
 #Scale Salt_Avg Max Peaks to Corresponding Peaks in Spectra_Avg
@@ -675,8 +678,6 @@ legend(x = "topleft",
 
 ####END####
 
-
-
 #Explore Best Fits
 ####Hotelling's T^2####
 base123.scores <- data.frame(comp1 = base123.fit$scores[,1], 
@@ -993,17 +994,14 @@ legend("top", legend = c("Component 1", "Component 2"), fill = c("black", "red")
 ####END####
 
 ####Coefficients Plot####
-plot(base123.fit[[1]],
-     type = "l"
-     )
+#plot(base123.fit[[1]],
+#     type = "l"
+#     )
 
 #Choose Number of Components
-Num.components <- 6
+Num.components <- 9
 
-#wavenumbers_region <- wavenumbers_NoCO2[c(region_2800_2999,region_650_1800)]
-
-#wavenumbers_MW <- wavenumbers_NoCO2[c(Base.Region2,Base.Region3,Base.Region,Base.Region4)]
-wavenumbers_MW <- wavenumbers_NoCO2[c(Base.Region1 ,Base.Region2, Base.Region3)]
+#wavenumbers_MW <- wavenumbers_NoCO2[c(Base.Region1 ,Base.Region2, Base.Region3)]
 
 plot(wavenumbers_NoCO2,
      plsr.fit$coefficients[,1,Num.components],
@@ -1151,17 +1149,18 @@ plot(wavenumbers_MW,
 
 abline(h = 0, col = "blue")
 minor.tick(nx = 4)
+####END####
 
-#Store Coefficients as Object
+####Peak Analysis of Regression Coefficients####
 #Full Spectrum
-Fit.Coefficients <- plsr.fit$coefficients[,1,3]
+Fit.Coefficients <- plsr.fit$coefficients[,1,9]
 
 #MW
 #Fit.Coefficients <- base1234.fit$coefficients[,1,3]
-Fit.Coefficients <- base123.fit$coefficients[,1,4]
+#Fit.Coefficients <- base123.fit$coefficients[,1,4]
 
 #Peak-Finding Procedure
-peaks.pos <- find_peaks(Fit.Coefficients, m = 2)
+peaks.pos <- find_peaks(Fit.Coefficients, m = 3)
 
 peaks.pos <- peaks.pos[which(Fit.Coefficients[peaks.pos]>0)]
 
@@ -1173,11 +1172,12 @@ peaks <- sort(c(peaks.pos, peaks.neg), decreasing = TRUE)
 
 #Add lines: Full Spectrum Peaks
 #abline(v = wavenumbers_NoCO2[peaks], col = "coral", lty =2)
-abline(v = c(824,965,997,1016,1065,1193,1299,1351,1372,1513,1653), col = "coral", lty =2)
+abline(v = c(3386,3146,2922,1720,1657,1577,1435,1388,1288,1232,1159,1109,1023,984), 
+       col = "coral", lty = 2)
 
 #Add lines: MW Peaks
-abline(v = wavenumbers_MW[peaks], col = "darkgrey", lty = 2)
-abline(v = 1334, col = "darkgrey", lty = 2)
+#abline(v = wavenumbers_MW[peaks], col = "darkgrey", lty = 2)
+#abline(v = 1334, col = "darkgrey", lty = 2)
 #abline(v = c(1344,1232,1074), col = "coral", lty =2)
 
 
